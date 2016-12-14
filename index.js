@@ -8,41 +8,46 @@ const postcss = require('postcss');
 module.exports = postcss.plugin('postcss-words', ({
 	functions = ['url'],
 	keywords = '.csswords.json'
-}) => {
-	return (css) => {
-		// get the current file path
-		const cwf = css.source.input.file;
+} = {}) => (css) => {
+	// get the current file path
+	const cwf = css.source.input.file;
 
-		// directory by current file or current working directory
-		const dir = cwf ? path.dirname(cwf) : process.cwd();
+	// directory by current file or current working directory
+	const dir = cwf ? path.dirname(cwf) : process.cwd();
 
-		return (
-			typeof keywords === 'string' ? readFile(path.resolve(dir, keywords)).then(
-				(json) => JSON.parse(json)
-			) : Promise.resolve(keywords)
-		).then(
-			(words) => {
-				css.walkDecls(
-					(decl) => {
-						const value = parser(decl.value).walk(
-							(node) => {
-								if (node.type !== 'function' || functions.indexOf(node.value) > -1) {
-									if (node.type === 'word' && node.value in words) {
-										node.value = words[node.value];
-									}
+	return (
+		typeof keywords === 'string' ? readFile(path.resolve(dir, keywords)).then(
+			(json) => JSON.parse(json)
+		) : Promise.resolve(keywords)
+	).then(
+		(words) => {
+			css.walkDecls(
+				(decl) => {
+					const value = parser(decl.value).walk(
+						(node) => {
+							if (node.type !== 'function' || functions.indexOf(node.value) > -1) {
+								if (node.type === 'word' && node.value in words) {
+									node.value = words[node.value];
 								}
 							}
-						).toString();
-
-						if (value !== decl.value) {
-							decl.value = value;
 						}
+					).toString();
+
+					if (value !== decl.value) {
+						decl.value = value;
 					}
-				);
-			}
-		);
-	};
+				}
+			);
+		}
+	);
 });
+
+// override plugin#process
+module.exports.process = function (cssString, pluginOptions, processOptions) {
+	return postcss([
+		0 in arguments ? module.exports(pluginOptions) : module.exports()
+	]).process(cssString, processOptions);
+};
 
 // promise read file
 const readFile = (file) => new Promise(
